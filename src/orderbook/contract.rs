@@ -15,7 +15,7 @@ use crate::msg::{
 use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cortado-options";
+const CONTRACT_NAME: &str = "crates.io:cortado-orderbook";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]

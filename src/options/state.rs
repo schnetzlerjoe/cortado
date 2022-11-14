@@ -1,24 +1,32 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Timestamp};
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub enum Option {
+    Call,
+    Put,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Call {
     pub creator: Addr,
     pub owner: Addr,
-    pub collateral: Vec<Coin>,
-    pub counter_offer: Vec<Coin>,
-    pub expires: u64,
+    pub collateral: Coin,
+    pub strike: Coin,
+    pub premium: Coin,
+    pub expires: Timestamp,
 }
 
 impl Call {
-    pub fn new (creator: Addr, owner: Addr, collateral: Vec<Coin>, counter_offer: Vec<Coin>, expires: u64, option_type: String,) -> Self {
+    pub fn new (creator: Addr, owner: Addr, collateral: Coin, strike: Coin, premium: Coin, expires: Timestamp,) -> Self {
         Call {
             creator,
             owner,
             collateral,
-            counter_offer,
+            strike,
+            premium,
             expires,
         }
     }
@@ -28,18 +36,20 @@ impl Call {
 pub struct Put {
     pub creator: Addr,
     pub owner: Addr,
-    pub collateral: Vec<Coin>,
-    pub counter_offer: Vec<Coin>,
-    pub expires: u64,
+    pub collateral: Coin,
+    pub strike: Coin,
+    pub premium: Coin,
+    pub expires: Timestamp,
 }
 
 impl Put {
-    pub fn new (creator: Addr, owner: Addr, collateral: Vec<Coin>, counter_offer: Vec<Coin>, expires: u64, option_type: String,) -> Self {
+    pub fn new (creator: Addr, owner: Addr, collateral: Coin, strike: Coin, premium: Coin, expires: Timestamp,) -> Self {
         Put {
             creator,
             owner,
             collateral,
-            counter_offer,
+            strike,
+            premium,
             expires,
         }
     }

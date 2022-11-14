@@ -6,6 +6,10 @@ use crate::error::ContractError;
 use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{config, config_read, Option};
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cortado-options";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
