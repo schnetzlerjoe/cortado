@@ -9,8 +9,6 @@ pub struct InstantiateMsg {}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// Create a new options market
-    CreateMarket(CreateMarketMsg),
     /// Submit a new buy limit order
     CreateBuyOrder(CreateBuyOrderMsg),
     /// Submit a new sell limit order
@@ -19,10 +17,6 @@ pub enum ExecuteMsg {
     CancelBuyOrder(CancelBuyOrderMsg),
     /// Cancel a sell limit order
     CancelSellOrder(CancelSellOrderMsg),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CreateMarketMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

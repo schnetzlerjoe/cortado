@@ -26,7 +26,7 @@ pub fn instantiate(
     _msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    // no setup
+    // setup the new options market here
     Ok(Response::default())
 }
 
@@ -38,16 +38,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Create(msg) => {
-            execute_create(deps, msg, Balance::from(info.funds), &info.sender)
-        }
-        ExecuteMsg::SetRecipient { id, recipient } => {
-            execute_set_recipient(deps, env, info, id, recipient)
-        }
-        ExecuteMsg::Approve { id } => execute_approve(deps, env, info, id),
-        ExecuteMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
-        ExecuteMsg::Refund { id } => execute_refund(deps, env, info, id),
         ExecuteMsg::Receive(msg) => execute_receive(deps, info, msg),
+        ExecuteMsg::CreateMarket(msg) => execute_create_market(deps, info, msg),
     }
 }
 
@@ -68,200 +60,6 @@ pub fn execute_receive(
         }
         ReceiveMsg::TopUp { id } => execute_top_up(deps, id, balance),
     }
-}
-
-pub fn execute_create(
-    deps: DepsMut,
-    msg: CreateMsg,
-    balance: Balance,
-    sender: &Addr,
-) -> Result<Response, ContractError> {
-    if balance.is_empty() {
-        return Err(ContractError::EmptyBalance {});
-    }
-
-    let mut cw20_whitelist = msg.addr_whitelist(deps.api)?;
-
-    let escrow_balance = match balance {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => {
-            // make sure the token sent is on the whitelist by default
-            if !cw20_whitelist.iter().any(|t| t == &token.address) {
-                cw20_whitelist.push(token.address.clone())
-            }
-            GenericBalance {
-                native: vec![],
-                cw20: vec![token],
-            }
-        }
-    };
-
-    let recipient: Option<Addr> = msg
-        .recipient
-        .and_then(|addr| deps.api.addr_validate(&addr).ok());
-
-    let escrow = Escrow {
-        arbiter: deps.api.addr_validate(&msg.arbiter)?,
-        recipient,
-        source: sender.clone(),
-        title: msg.title,
-        description: msg.description,
-        end_height: msg.end_height,
-        end_time: msg.end_time,
-        balance: escrow_balance,
-        cw20_whitelist,
-    };
-
-    // try to store it, fail if the id was already in use
-    ESCROWS.update(deps.storage, &msg.id, |existing| match existing {
-        None => Ok(escrow),
-        Some(_) => Err(ContractError::AlreadyInUse {}),
-    })?;
-
-    let res = Response::new().add_attributes(vec![("action", "create"), ("id", msg.id.as_str())]);
-    Ok(res)
-}
-
-pub fn execute_set_recipient(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    id: String,
-    recipient: String,
-) -> Result<Response, ContractError> {
-    let mut escrow = ESCROWS.load(deps.storage, &id)?;
-    if info.sender != escrow.arbiter {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    let recipient = deps.api.addr_validate(recipient.as_str())?;
-    escrow.recipient = Some(recipient.clone());
-    ESCROWS.save(deps.storage, &id, &escrow)?;
-
-    Ok(Response::new().add_attributes(vec![
-        ("action", "set_recipient"),
-        ("id", id.as_str()),
-        ("recipient", recipient.as_str()),
-    ]))
-}
-
-pub fn execute_top_up(
-    deps: DepsMut,
-    id: String,
-    balance: Balance,
-) -> Result<Response, ContractError> {
-    if balance.is_empty() {
-        return Err(ContractError::EmptyBalance {});
-    }
-    // this fails is no escrow there
-    let mut escrow = ESCROWS.load(deps.storage, &id)?;
-
-    if let Balance::Cw20(token) = &balance {
-        // ensure the token is on the whitelist
-        if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
-            return Err(ContractError::NotInWhitelist {});
-        }
-    };
-
-    escrow.balance.add_tokens(balance);
-
-    // and save
-    ESCROWS.save(deps.storage, &id, &escrow)?;
-
-    let res = Response::new().add_attributes(vec![("action", "top_up"), ("id", id.as_str())]);
-    Ok(res)
-}
-
-pub fn execute_approve(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: String,
-) -> Result<Response, ContractError> {
-    // this fails is no escrow there
-    let escrow = ESCROWS.load(deps.storage, &id)?;
-
-    if info.sender != escrow.arbiter {
-        return Err(ContractError::Unauthorized {});
-    }
-    if escrow.is_expired(&env) {
-        return Err(ContractError::Expired {});
-    }
-
-    let recipient = escrow.recipient.ok_or(ContractError::RecipientNotSet {})?;
-
-    // we delete the escrow
-    ESCROWS.remove(deps.storage, &id);
-
-    // send all tokens out
-    let messages: Vec<SubMsg> = send_tokens(&recipient, &escrow.balance)?;
-
-    Ok(Response::new()
-        .add_attribute("action", "approve")
-        .add_attribute("id", id)
-        .add_attribute("to", recipient)
-        .add_submessages(messages))
-}
-
-pub fn execute_refund(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: String,
-) -> Result<Response, ContractError> {
-    // this fails is no escrow there
-    let escrow = ESCROWS.load(deps.storage, &id)?;
-
-    // the arbiter can send anytime OR anyone can send after expiration
-    if !escrow.is_expired(&env) && info.sender != escrow.arbiter {
-        Err(ContractError::Unauthorized {})
-    } else {
-        // we delete the escrow
-        ESCROWS.remove(deps.storage, &id);
-
-        // send all tokens out
-        let messages = send_tokens(&escrow.source, &escrow.balance)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "refund")
-            .add_attribute("id", id)
-            .add_attribute("to", escrow.source)
-            .add_submessages(messages))
-    }
-}
-
-fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<SubMsg>> {
-    let native_balance = &balance.native;
-    let mut msgs: Vec<SubMsg> = if native_balance.is_empty() {
-        vec![]
-    } else {
-        vec![SubMsg::new(BankMsg::Send {
-            to_address: to.into(),
-            amount: native_balance.to_vec(),
-        })]
-    };
-
-    let cw20_balance = &balance.cw20;
-    let cw20_msgs: StdResult<Vec<_>> = cw20_balance
-        .iter()
-        .map(|c| {
-            let msg = Cw20ExecuteMsg::Transfer {
-                recipient: to.into(),
-                amount: c.amount,
-            };
-            let exec = SubMsg::new(WasmMsg::Execute {
-                contract_addr: c.address.to_string(),
-                msg: to_binary(&msg)?,
-                funds: vec![],
-            });
-            Ok(exec)
-        })
-        .collect();
-    msgs.append(&mut cw20_msgs?);
-    Ok(msgs)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
