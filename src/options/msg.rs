@@ -1,13 +1,16 @@
-use cosmwasm_std::Coin;
+use cosmwasm_std::{Coin, Addr, Timestamp};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    // owner and creator come from env
-    // collateral comes from env
-    pub counter_offer: Vec<Coin>,
-    pub expires: u64,
+    pub creator: Addr,
+    pub owner: Addr,
+    pub collateral: Coin,
+    pub strike: Coin,
+    pub premium: Coin,
+    pub expires: Timestamp,
+    pub option_type: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -17,8 +20,6 @@ pub enum ExecuteMsg {
     Transfer { recipient: String },
     /// Owner can post counter_offer on unexpired option to execute and get the collateral
     Execute {},
-    /// Burn will release collateral if expired
-    Burn {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

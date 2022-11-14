@@ -1,21 +1,27 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, Timestamp, Addr, Uint64};
-
-use crate::options::{Call, Option};
+use cosmwasm_std::{Coin, Timestamp, Uint64, Uint256};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct SellOrder {
-    pub option: Addr,
+    /// the string wasm address for the option being sold 
+    pub option: String,
+    /// the price you are willing to sell for
     pub price: Coin,
+    /// time the order was submitted
     pub submitted: Timestamp,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct BuyOrder {
-    pub option: Addr,
+    /// amount of underlying shares you would like
+    pub amount: Uint256,
+    /// what option type you want (either call or put)
+    pub option_type: String,
+    /// price per underlying you are willing to pay
     pub price: Coin,
+    /// the time the order was submitted
     pub submitted: Timestamp,
 }
 

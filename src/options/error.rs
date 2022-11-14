@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, StdError};
+use cosmwasm_std::{Coin, StdError, Timestamp};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -7,7 +7,7 @@ pub enum ContractError {
     Std(#[from] StdError),
 
     #[error("expired option (expired {expired:?})")]
-    OptionExpired { expired: u64 },
+    OptionExpired { expired: Timestamp },
 
     #[error("not expired option (expires {expires:?})")]
     OptionNotExpired { expires: u64 },
@@ -25,5 +25,5 @@ pub enum ContractError {
     FundsSentWithBurn {},
 
     #[error("option type is invalid (must be call or put)")]
-    InvalidOptionType {},
+    InvalidOptionType { option_type: String },
 }

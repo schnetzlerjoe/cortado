@@ -2,9 +2,9 @@ use cosmwasm_std::{
     entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
-use crate::error::ContractError;
-use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{config, config_read, Option};
+use crate::options::error::ContractError;
+use crate::options::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::options::state::{Option, CONFIG};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cortado-options";
@@ -17,21 +17,28 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    if msg.expires <= env.block.height {
+    if msg.expires <= env.block.time {
         return Err(ContractError::OptionExpired {
             expired: msg.expires,
+        });
+    }
+
+    if msg.option_type != "call" && msg.option_type != "put" {
+        return Err(ContractError::InvalidOptionType {
+            option_type: msg.option_type,
         });
     }
 
     let state = Option {
         creator: info.sender.clone(),
         owner: info.sender.clone(),
-        collateral: info.funds,
-        counter_offer: msg.counter_offer,
+        collateral: msg.collateral,
+        strike: msg.strike,
         expires: msg.expires,
+        option_type: msg.option_type
     };
 
-    config(deps.storage).save(&state)?;
+    CONFIG.save(deps.storage, &state)?;
 
     Ok(Response::default())
 }
@@ -46,7 +53,6 @@ pub fn execute(
     match msg {
         ExecuteMsg::Transfer { recipient } => execute_transfer(deps, env, info, recipient),
         ExecuteMsg::Execute {} => execute_execute(deps, env, info),
-        ExecuteMsg::Burn {} => execute_burn(deps, env, info),
     }
 }
 
@@ -114,34 +120,6 @@ pub fn execute_execute(
     config(deps.storage).remove();
 
     res = res.add_attribute("action", "execute");
-    Ok(res)
-}
-
-pub fn execute_burn(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    // ensure is expired
-    let state = config(deps.storage).load()?;
-    if env.block.height < state.expires {
-        return Err(ContractError::OptionNotExpired {
-            expires: state.expires,
-        });
-    }
-
-    // ensure sending proper counter_offer
-    if !info.funds.is_empty() {
-        return Err(ContractError::FundsSentWithBurn {});
-    }
-
-    // release collateral to creator
-    let mut res = Response::new();
-    res = res.add_message(BankMsg::Send {
-        to_address: state.creator.to_string(),
-        amount: state.collateral,
-    });
-
-    // delete the option
-    config(deps.storage).remove();
-
-    res = res.add_attribute("action", "burn");
     Ok(res)
 }
 
@@ -289,62 +267,6 @@ mod tests {
             res.messages[1].msg,
             CosmosMsg::Bank(BankMsg::Send {
                 to_address: "owner".into(),
-                amount: collateral,
-            })
-        );
-
-        // check deleted
-        let _ = query_config(deps.as_ref()).unwrap_err();
-    }
-
-    #[test]
-    fn burn() {
-        let mut deps = mock_dependencies();
-
-        let counter_offer = coins(40, "ETH");
-        let collateral = coins(1, "BTC");
-        let msg_expires = 100_000;
-        let msg = InstantiateMsg {
-            counter_offer: counter_offer.clone(),
-            expires: msg_expires,
-        };
-        let info = mock_info("creator", &collateral);
-
-        // we can just call .unwrap() to assert this was a success
-        let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // set new owner
-        let info = mock_info("creator", &[]);
-        let _ = execute_transfer(deps.as_mut(), mock_env(), info, "owner".to_string()).unwrap();
-
-        // non-expired cannot execute
-        let info = mock_info("anyone", &[]);
-        let err = execute_burn(deps.as_mut(), mock_env(), info).unwrap_err();
-        match err {
-            ContractError::OptionNotExpired { expires } => assert_eq!(expires, msg_expires),
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // with funds cannot execute
-        let info = mock_info("anyone", &counter_offer);
-        let mut env = mock_env();
-        env.block.height = 200_000;
-        let err = execute_burn(deps.as_mut(), env, info).unwrap_err();
-        match err {
-            ContractError::FundsSentWithBurn {} => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // expired returns funds
-        let info = mock_info("anyone", &[]);
-        let mut env = mock_env();
-        env.block.height = 200_000;
-        let res = execute_burn(deps.as_mut(), env, info).unwrap();
-        assert_eq!(res.messages.len(), 1);
-        assert_eq!(
-            res.messages[0].msg,
-            CosmosMsg::Bank(BankMsg::Send {
-                to_address: "creator".into(),
                 amount: collateral,
             })
         );
