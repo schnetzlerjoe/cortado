@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 
 use crate::options::error::ContractError;
@@ -51,6 +51,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        ExecuteMsg::Create {} => execute_create(deps, env, info),
         ExecuteMsg::Transfer { recipient } => execute_transfer(deps, env, info, recipient),
         ExecuteMsg::Execute {} => execute_execute(deps, env, info),
     }

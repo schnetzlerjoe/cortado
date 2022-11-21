@@ -16,6 +16,8 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    // Create a new option and mint the CW20 token to represent it
+    Create {},
     /// Owner can transfer to a new owner
     Transfer { recipient: String },
     /// Owner can post counter_offer on unexpired option to execute and get the collateral

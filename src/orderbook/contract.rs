@@ -14,6 +14,11 @@ use crate::msg::{
 };
 use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 
+use cw20_base::contract::{
+    execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
+};
+use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cortado-orderbook";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -27,6 +32,21 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // setup the new options market here
+
+    // launch the CW20 token for this option market
+    let data = TokenInfo {
+        name: msg,
+        symbol: "cOSMO/call",
+        decimals: 8,
+        total_supply: Uint128::zero(),
+        // set self as minter, so we can properly execute mint and burn
+        mint: Some(MinterData {
+            minter: env.contract.address,
+            cap: None,
+        }),
+    };
+    TOKEN_INFO.save(deps.storage, &data)?;
+
     Ok(Response::default())
 }
 
