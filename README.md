@@ -2,7 +2,7 @@
 
 This is the repository for all the Cosmwasm contracts for Cortado Finance. Cortado is the premier, chain agnostic, options exchange with a built in on-chain market maker utilizing Option Vaults.
 
-Utilizing a specially designed on-chain CLOB (central-limit order book) with built in on-chain market making through Option Vaults, Cortado is designed to be the most liquid and efficient crypto options exchange on the planet. By allowing liquidity providers to pool into option vaults, Cortado allows option creators to write options by creating derivatives on the option vaults.
+Utilizing a specially designed on-chain market marker through Option Vaults, Cortado is designed to be the most liquid and efficient crypto options exchange on the planet. By allowing liquidity providers to pool into option vaults, Cortado allows option creators to write options by creating derivatives on the option vaults.
 
 Using a chain agnostic approach and hub and spoke model with Axelar and IBC, Cortado is chain agnostic meaning markets with underlyings from 70+ IBC chains and 12 EVM chains (including the top ones) can be created and then auctioned off on any DEX that Cortado launches its contracts on that supports Cosmwasm.
 
